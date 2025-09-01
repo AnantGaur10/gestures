@@ -7,8 +7,8 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Get webhook secret from environment variable
-WEBHOOK_SECRET_TOKEN = os.environ.get('ZOOM_WEBHOOK_SECRET', 'your_webhook_secret_here')
+# For API Secret Token validation, use your app's Client Secret
+WEBHOOK_SECRET_TOKEN = os.environ.get('ZOOM_CLIENT_SECRET', 'your_client_secret_here')
 
 @app.route('/', methods=['GET'])
 def health_check():
