@@ -14,7 +14,8 @@ WEBHOOK_SECRET_TOKEN = os.environ.get('ZOOM_CLIENT_SECRET', 'your_client_secret_
 def health_check():
     return jsonify({
         'status': 'Zoom Webhook Server Running',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'secret' : WEBHOOK_SECRET_TOKEN
     })
 
 @app.route('/webhook', methods=['POST'])
