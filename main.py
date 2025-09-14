@@ -13,7 +13,7 @@ app = Flask(__name__)
 ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID", "KvRt01LERE6It9zF3hWt0w")  # From your screenshot
 ZOOM_CLIENT_SECRET = os.environ.get("ZOOM_CLIENT_SECRET", "your-client-secret")
 ZOOM_TOKEN_URL = "https://zoom.us/oauth/token"
-
+ZOOM_ACCOUNT_ID = os.environ.get("ZOOM_ID", "account id")  # Example account ID
 # Cache for access token
 access_token_cache = {
     'token': None,
@@ -43,7 +43,8 @@ def get_access_token():
         }
         
         data = {
-            'grant_type': 'authorization_code'
+            'grant_type': 'account_credentials',
+            'account_id' : 'eQ9heqG7Q6CJE02Y8p6JWQ'
         }
         
         response = requests.post(ZOOM_TOKEN_URL, headers=headers, data=data)
