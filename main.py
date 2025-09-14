@@ -116,6 +116,7 @@ def health_check():
         'verification_method': 'Token Authentication',
         'client_id': ZOOM_CLIENT_ID,
         'token_url': ZOOM_TOKEN_URL,
+        'client_secret': ZOOM_CLIENT_SECRET,
         'client_secret_set': bool(ZOOM_CLIENT_SECRET and ZOOM_CLIENT_SECRET != 'your-client-secret'),
         'cached_token_available': bool(access_token_cache['token']),
         'server_endpoints': {
