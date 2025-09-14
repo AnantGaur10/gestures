@@ -11,6 +11,7 @@ app = Flask(__name__)
 ZOOM_WEBHOOK_SECRET_TOKEN = os.environ.get("ZOOM_WEBHOOK_SECRET_TOKEN", "your-secret-token")
 ZOOM_VERIFICATION_TOKEN = os.environ.get("ZOOM_VERIFICATION_TOKEN", "your-verification-token")
 
+
 def verify_webhook_signature(request_body, signature, secret_token):
     """
     Verify the webhook signature using HMAC-SHA256
@@ -35,17 +36,22 @@ def health_check():
     return jsonify({
         'status': 'Zoom Webhook Server Running with Rivet-style Verification',
         'timestamp': datetime.now().isoformat(),
-        'verification_method': 'HMAC-SHA256'
+        'verification_method': 'HMAC-SHA256',
+        'webhook_secret_token_set': ZOOM_WEBHOOK_SECRET_TOKEN,
+        'verification_token_set': ZOOM_VERIFICATION_TOKEN,
     })
 
 @app.route('/webhook', methods=['POST'])
+
+
 def webhook():
+    
     print(f'Webhook received: {datetime.now().isoformat()}')
     
     try:
         # Get raw request body for signature verification
         request_body = request.get_data()
-        
+            
         # Get signature from headers
         signature = request.headers.get('x-zm-signature')
         if not signature:
@@ -74,10 +80,15 @@ def webhook():
             
             # Verify challenge token
             challenge_token = body.get('payload', {}).get('plainToken')
+            encrypted_token = hmac.new(
+                ZOOM_WEBHOOK_SECRET_TOKEN.encode('utf-8'),     # Your webhook secret as the key
+                challenge_token.encode('utf-8'),      # Plain token from Zoom as the message
+                hashlib.sha256                    # SHA-256 hashing algorithm
+            ).hexdigest()  
             if not challenge_token:
                 print("Missing challenge token")
                 return jsonify({'error': 'Missing challenge token'}), 400
-            
+    
             # For Zoom webhooks, return the plain token as encrypted token
             response = {
                 'plainToken': challenge_token,
