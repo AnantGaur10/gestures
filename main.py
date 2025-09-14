@@ -92,7 +92,7 @@ def webhook():
             # For Zoom webhooks, return the plain token as encrypted token
             response = {
                 'plainToken': challenge_token,
-                'encryptedToken': challenge_token
+                'encryptedToken': encrypted_token
             }
             print(f'Responding to challenge with: {response}')
             return jsonify(response), 200
