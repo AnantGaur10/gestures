@@ -38,13 +38,12 @@ def get_access_token():
         encoded_auth = base64.b64encode(auth_header.encode()).decode()
         
         headers = {
-            'Authorization': f'Basic S3Y4dDAxTEVSRTZJdDl6RjNoV3QwdzpkbzZFSm9uSFFlTjNMS2kxb296UUhCalpFYUhCNzNBcw==',
+            'Authorization': f'Basic {encoded_auth}',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
         
         data = {
-            'grant_type': 'account_credentials',
-            'account_id' : 'eQ9heqG7Q6CJE02Y8p6JWQ'
+            'grant_type': 'client_credentials',
         }
         
         response = requests.post(ZOOM_TOKEN_URL, headers=headers, data=data)
