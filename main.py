@@ -10,7 +10,7 @@ import base64
 app = Flask(__name__)
 
 # Zoom Webhook credentials for Token Authentication
-ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID", "KvRt01LERE6It9zF3hWt0w")  # From your screenshot
+ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID", "client id")  # From your screenshot
 ZOOM_CLIENT_SECRET = os.environ.get("ZOOM_CLIENT_SECRET", "your-client-secret")
 ZOOM_TOKEN_URL = "https://zoom.us/oauth/token"
 ZOOM_ACCOUNT_ID = os.environ.get("ZOOM_ID", "account id")  # Example account ID
@@ -38,7 +38,7 @@ def get_access_token():
         encoded_auth = base64.b64encode(auth_header.encode()).decode()
         
         headers = {
-            'Authorization': f'Basic {encoded_auth}',
+            'Authorization': f'Basic S3Y4dDAxTEVSRTZJdDl6RjNoV3QwdzpkbzZFSm9uSFFlTjNMS2kxb296UUhCalpFYUhCNzNBcw==',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
         
