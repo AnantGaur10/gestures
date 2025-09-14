@@ -61,7 +61,7 @@ def get_access_token():
             return access_token
         else:
             print(f"❌ Failed to get access token: {response.status_code} - {response.text}")
-            return None
+            return response.text
             
     except Exception as e:
         print(f"❌ Error getting access token: {str(e)}")
@@ -373,6 +373,7 @@ def test_validation():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+token = ""
 @app.route('/get-token', methods=['GET'])
 def get_token_endpoint():
     """Get access token for testing"""
@@ -384,7 +385,7 @@ def get_token_endpoint():
             'timestamp': datetime.now().isoformat()
         })
     else:
-        return jsonify({'error': 'Failed to get access token'}), 400
+        return jsonify({'error': 'Failed to get access token','error_reason' : token}), 400
 
 # Event handler functions - customize these based on your needs
 def handle_meeting_started(meeting_id, meeting_uuid, host_id, topic, start_time):
