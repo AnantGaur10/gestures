@@ -43,7 +43,7 @@ def get_access_token():
         }
         
         data = {
-            'grant_type': 'client_credentials'
+            'grant_type': 'authorization_code'
         }
         
         response = requests.post(ZOOM_TOKEN_URL, headers=headers, data=data)
