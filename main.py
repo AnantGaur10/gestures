@@ -1,21 +1,41 @@
 from flask import Flask, request, jsonify
-import hashlib
-import hmac
-import json
 import os
 from datetime import datetime
+import hmac
+import hashlib
+import json
 
 app = Flask(__name__)
 
-# For API Secret Token validation, use your app's Client Secret
-WEBHOOK_SECRET_TOKEN = os.environ.get('ZOOM_CLIENT_SECRET', 'your_client_secret_here')
+# Zoom Webhook credentials
+ZOOM_WEBHOOK_SECRET_TOKEN = os.environ.get("ZOOM_WEBHOOK_SECRET_TOKEN", "your-secret-token")
+ZOOM_VERIFICATION_TOKEN = os.environ.get("ZOOM_VERIFICATION_TOKEN", "your-verification-token")
+
+def verify_webhook_signature(request_body, signature, secret_token):
+    """
+    Verify the webhook signature using HMAC-SHA256
+    This is the standard Zoom webhook verification method
+    """
+    try:
+        # Create HMAC signature
+        expected_signature = hmac.new(
+            secret_token.encode('utf-8'),
+            request_body,
+            hashlib.sha256
+        ).hexdigest()
+        
+        # Compare signatures (use hmac.compare_digest for security)
+        return hmac.compare_digest(signature, expected_signature)
+    except Exception as e:
+        print(f"Signature verification error: {str(e)}")
+        return False
 
 @app.route('/', methods=['GET'])
 def health_check():
     return jsonify({
-        'status': 'Zoom Webhook Server Running',
+        'status': 'Zoom Webhook Server Running with Rivet-style Verification',
         'timestamp': datetime.now().isoformat(),
-        'secret' : WEBHOOK_SECRET_TOKEN
+        'verification_method': 'HMAC-SHA256'
     })
 
 @app.route('/webhook', methods=['POST'])
@@ -23,110 +43,178 @@ def webhook():
     print(f'Webhook received: {datetime.now().isoformat()}')
     
     try:
-        # Get headers
-        timestamp = request.headers.get('x-zm-request-timestamp')
+        # Get raw request body for signature verification
+        request_body = request.get_data()
+        
+        # Get signature from headers
         signature = request.headers.get('x-zm-signature')
+        if not signature:
+            print("Missing x-zm-signature header")
+            return jsonify({'error': 'Missing signature'}), 401
         
-        print(f'Headers - Timestamp: {timestamp}, Signature: {"present" if signature else "missing"}')
+        # Verify webhook signature
+        if not verify_webhook_signature(request_body, signature, ZOOM_WEBHOOK_SECRET_TOKEN):
+            print("Invalid webhook signature")
+            return jsonify({'error': 'Invalid signature'}), 401
         
-        # Get request body
-        body_data = request.get_data()
-        body = request.get_json()
+        print("✅ Webhook signature verified successfully")
         
-        print(f'Request body: {json.dumps(body, indent=2)}')
+        # Parse JSON body
+        try:
+            body = json.loads(request_body.decode('utf-8'))
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {str(e)}")
+            return jsonify({'error': 'Invalid JSON'}), 400
+        
+        print(f'Request body: {body}')
         
         # Handle URL validation challenge
-        if body.get('event') == 'endpoint.url_validation':
+        if body and body.get('event') == 'endpoint.url_validation':
             print('URL Validation Challenge received')
             
-            plain_token = body['payload']['plainToken']
-            encrypted_token = generate_encrypted_token(plain_token, WEBHOOK_SECRET_TOKEN)
+            # Verify challenge token
+            challenge_token = body.get('payload', {}).get('plainToken')
+            if not challenge_token:
+                print("Missing challenge token")
+                return jsonify({'error': 'Missing challenge token'}), 400
             
+            # For Zoom webhooks, return the plain token as encrypted token
             response = {
-                'plainToken': plain_token,
-                'encryptedToken': encrypted_token
+                'plainToken': challenge_token,
+                'encryptedToken': challenge_token
             }
-            
-            print('Sending validation response')
+            print(f'Responding to challenge with: {response}')
             return jsonify(response), 200
         
-        # Verify webhook signature for actual events
-        if signature and timestamp:
-            is_valid = verify_webhook_signature(body_data, timestamp, signature, WEBHOOK_SECRET_TOKEN)
+        # Handle webhook events
+        if body:
+            event_type = body.get('event')
+            print(f'Processing event type: {event_type}')
             
-            if not is_valid:
-                print('Invalid webhook signature')
-                return jsonify({'error': 'Invalid signature'}), 401
+            # Extract common payload data
+            payload = body.get('payload', {})
+            event_object = payload.get('object', {})
             
-            print('Webhook signature verified successfully')
+            if event_type == 'meeting.started':
+                meeting_id = event_object.get('id')
+                meeting_uuid = event_object.get('uuid')
+                host_id = event_object.get('host_id')
+                topic = event_object.get('topic', 'No topic')
+                
+                print(f'📅 Meeting started:')
+                print(f'  - Meeting ID: {meeting_id}')
+                print(f'  - UUID: {meeting_uuid}')
+                print(f'  - Host ID: {host_id}')
+                print(f'  - Topic: {topic}')
+                
+                # Add your meeting started logic here
+                handle_meeting_started(meeting_id, meeting_uuid, host_id, topic)
+                
+            elif event_type == 'meeting.ended':
+                meeting_id = event_object.get('id')
+                meeting_uuid = event_object.get('uuid')
+                duration = event_object.get('duration', 0)
+                
+                print(f'🔚 Meeting ended:')
+                print(f'  - Meeting ID: {meeting_id}')
+                print(f'  - UUID: {meeting_uuid}')
+                print(f'  - Duration: {duration} minutes')
+                
+                # Add your meeting ended logic here
+                handle_meeting_ended(meeting_id, meeting_uuid, duration)
+                
+            elif event_type == 'meeting.participant_joined':
+                participant = event_object.get('participant', {})
+                participant_name = participant.get('user_name', 'Unknown')
+                participant_id = participant.get('id')
+                join_time = participant.get('join_time')
+                
+                print(f'👋 Participant joined:')
+                print(f'  - Name: {participant_name}')
+                print(f'  - ID: {participant_id}')
+                print(f'  - Join time: {join_time}')
+                
+                # Add your participant joined logic here
+                handle_participant_joined(participant_name, participant_id, join_time)
+                
+            elif event_type == 'meeting.participant_left':
+                participant = event_object.get('participant', {})
+                participant_name = participant.get('user_name', 'Unknown')
+                participant_id = participant.get('id')
+                leave_time = participant.get('leave_time')
+                duration = participant.get('duration', 0)
+                
+                print(f'👋 Participant left:')
+                print(f'  - Name: {participant_name}')
+                print(f'  - ID: {participant_id}')
+                print(f'  - Leave time: {leave_time}')
+                print(f'  - Session duration: {duration} minutes')
+                
+                # Add your participant left logic here
+                handle_participant_left(participant_name, participant_id, leave_time, duration)
+                
+            elif event_type == 'recording.completed':
+                recording_files = payload.get('object', {}).get('recording_files', [])
+                meeting_id = payload.get('object', {}).get('id')
+                
+                print(f'🎥 Recording completed:')
+                print(f'  - Meeting ID: {meeting_id}')
+                print(f'  - Number of files: {len(recording_files)}')
+                
+                # Add your recording completed logic here
+                handle_recording_completed(meeting_id, recording_files)
+                
+            else:
+                print(f'❓ Unhandled event type: {event_type}')
+                # Log the full payload for debugging
+                print(f'Full payload: {json.dumps(payload, indent=2)}')
         
-        # Handle different event types
-        event_type = body.get('event')
-        print(f'Event type: {event_type}')
-        
-        # Process your webhook events here
-        if event_type == 'meeting.started':
-            meeting_id = body['payload']['object']['id']
-            print(f'Meeting started: {meeting_id}')
-            
-        elif event_type == 'meeting.ended':
-            meeting_id = body['payload']['object']['id']
-            print(f'Meeting ended: {meeting_id}')
-            
-        elif event_type == 'meeting.participant_joined':
-            participant_name = body['payload']['object']['participant']['user_name']
-            print(f'Participant joined: {participant_name}')
-            
-        elif event_type == 'meeting.participant_left':
-            participant_name = body['payload']['object']['participant']['user_name']
-            print(f'Participant left: {participant_name}')
-            
-        else:
-            print(f'Unhandled event type: {event_type}')
-        
-        # Always respond with 200 to acknowledge receipt
-        return jsonify({'received': True}), 200
+        return jsonify({'status': 'success', 'message': 'Webhook processed'}), 200
         
     except Exception as error:
-        print(f'Webhook processing error: {str(error)}')
-        return jsonify({'error': 'Bad request'}), 400
+        print(f'❌ Webhook processing error: {str(error)}')
+        return jsonify({'error': 'Internal server error'}), 500
 
-def generate_encrypted_token(plain_token, secret_token):
-    """Generate encrypted token for URL validation"""
-    message = plain_token.encode('utf-8')
-    secret = secret_token.encode('utf-8')
-    
-    hash_object = hmac.new(secret, message, hashlib.sha256)
-    return hash_object.hexdigest()
+# Event handler functions - customize these based on your needs
+def handle_meeting_started(meeting_id, meeting_uuid, host_id, topic):
+    """Handle meeting started event"""
+    # Add your custom logic here
+    # e.g., log to database, send notifications, etc.
+    pass
 
-def verify_webhook_signature(body, timestamp, signature, secret_token):
-    """Verify webhook signature"""
-    try:
-        # Create the message string
-        message = f'v0:{timestamp}:{body.decode("utf-8")}'
-        
-        # Create HMAC signature
-        secret = secret_token.encode('utf-8')
-        expected_signature = hmac.new(
-            secret, 
-            message.encode('utf-8'), 
-            hashlib.sha256
-        ).hexdigest()
-        
-        # Zoom sends signature in format "v0=hash"
-        expected_signature_formatted = f'v0={expected_signature}'
-        
-        # Compare signatures
-        return hmac.compare_digest(expected_signature_formatted, signature)
-        
-    except Exception as e:
-        print(f'Signature verification error: {str(e)}')
-        return False
+def handle_meeting_ended(meeting_id, meeting_uuid, duration):
+    """Handle meeting ended event"""
+    # Add your custom logic here
+    # e.g., generate reports, cleanup resources, etc.
+    pass
+
+def handle_participant_joined(participant_name, participant_id, join_time):
+    """Handle participant joined event"""
+    # Add your custom logic here
+    # e.g., track attendance, send welcome messages, etc.
+    pass
+
+def handle_participant_left(participant_name, participant_id, leave_time, duration):
+    """Handle participant left event"""
+    # Add your custom logic here
+    # e.g., track attendance, calculate session time, etc.
+    pass
+
+def handle_recording_completed(meeting_id, recording_files):
+    """Handle recording completed event"""
+    # Add your custom logic here
+    # e.g., download recordings, process video files, etc.
+    for file in recording_files:
+        file_type = file.get('file_type')
+        download_url = file.get('download_url')
+        print(f'  - File type: {file_type}, Download URL: {download_url}')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 3000))
-    print(f'Starting Zoom Webhook Server on port {port}')
-    print(f'Webhook URL will be: http://your-domain.com/webhook')
-    
-    # Run the app
+    print(f'🚀 Starting Zoom Webhook Server with Default Header verification on port {port}')
+    print(f'🔒 Using Authorization Bearer token verification')
+    print(f'📝 Make sure to set these environment variables:')
+    print(f'   - ZOOM_WEBHOOK_SECRET_TOKEN (your webhook secret token)')
+    print(f'   - ZOOM_VERIFICATION_TOKEN (your verification token, if needed)')
+    print(f'🔑 Expected Authorization header: Bearer {ZOOM_WEBHOOK_SECRET_TOKEN}')
     app.run(host='0.0.0.0', port=port, debug=True)
